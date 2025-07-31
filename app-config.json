@@ -1,0 +1,103 @@
+{
+  "app": {
+    "name": "البيت السوداني",
+    "displayName": "Bayt Al Sudani",
+    "version": "1.0.0",
+    "bundle": "com.baytsudani.app",
+    "description": "منصة شاملة للخدمات والتجارة السودانية في الخليج والعالم"
+  },
+  "api": {
+    "baseUrl": "https://api.baytsudani.com",
+    "timeout": 30000,
+    "retries": 3,
+    "version": "v1"
+  },
+  "deep_linking": {
+    "scheme": "sudanapp",
+    "host": "baytsudani.com",
+    "universal_links": [
+      "https://baytsudani.com/products/*",
+      "https://baytsudani.com/companies/*",
+      "https://baytsudani.com/jobs/*",
+      "https://baytsudani.com/stores/*",
+      "https://baytsudani.com/services/*"
+    ]
+  },
+  "authentication": {
+    "tokenKey": "auth_token",
+    "refreshKey": "refresh_token",
+    "biometric": true,
+    "rememberMe": true,
+    "sessionTimeout": 30
+  },
+  "notifications": {
+    "enabled": true,
+    "sound": true,
+    "badge": true,
+    "alert": true,
+    "topics": ["general", "jobs", "products", "companies", "services"]
+  },
+  "features": {
+    "offline_mode": true,
+    "dark_theme": true,
+    "rtl_support": true,
+    "multi_language": ["ar", "en"],
+    "image_upload": true,
+    "location_services": true,
+    "share_content": true,
+    "qr_scanner": true
+  },
+  "storage": {
+    "cache_size": "50MB",
+    "auto_sync": true,
+    "sync_interval": 300000,
+    "offline_duration": 86400000
+  },
+  "social": {
+    "facebook": {
+      "enabled": true,
+      "app_id": "your_facebook_app_id"
+    },
+    "google": {
+      "enabled": true,
+      "client_id": "your_google_client_id"
+    },
+    "apple": {
+      "enabled": true,
+      "service_id": "your_apple_service_id"
+    }
+  },
+  "analytics": {
+    "google_analytics": "GA-XXXXXXXX-X",
+    "firebase": "your_firebase_config",
+    "custom_events": true
+  },
+  "app_store": {
+    "ios": {
+      "app_id": "1234567890",
+      "url": "https://apps.apple.com/app/bayt-al-sudani/id1234567890"
+    },
+    "android": {
+      "package_id": "com.baytsudani.app",
+      "url": "https://play.google.com/store/apps/details?id=com.baytsudani.app"
+    }
+  },
+  "ui": {
+    "primary_color": "#22C55E",
+    "secondary_color": "#16A34A",
+    "accent_color": "#F59E0B",
+    "error_color": "#EF4444",
+    "warning_color": "#F59E0B",
+    "success_color": "#10B981",
+    "fonts": {
+      "arabic": "NotoSansArabic",
+      "english": "Roboto"
+    }
+  },
+  "security": {
+    "api_key_required": true,
+    "ssl_pinning": true,
+    "request_signing": true,
+    "encryption": "AES-256"
+  }
+}

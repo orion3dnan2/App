@@ -1,0 +1,625 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User Management
+model User {
+  id          String      @id @default(cuid())
+  username    String      @unique
+  email       String      @unique
+  password    String
+  role        UserRole    @default(CUSTOMER)
+  isActive    Boolean     @default(true)
+  lastLogin   DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  profile     UserProfile?
+  permissions UserPermission[]
+  stores      Store[]
+  orders      Order[]
+  posts       ContentPage[]
+  systemLogs  SystemLog[]
+  media       Media[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  MERCHANT
+  CUSTOMER
+}
+
+model UserProfile {
+  id            String        @id @default(cuid())
+  userId        String        @unique
+  name          String
+  phone         String?
+  avatar        String?
+  language      Language      @default(AR)
+  
+  // Address fields
+  street        String?
+  city          String?
+  state         String?
+  country       String?
+  zipCode       String?
+  
+  // Business Info (for merchants)
+  businessName     String?
+  businessType     String?
+  taxId           String?
+  description     String?
+  logo            String?
+  coverImage      String?
+  
+  // Social Links
+  website         String?
+  facebook        String?
+  instagram       String?
+  twitter         String?
+  
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // Relations
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
+}
+
+enum Language {
+  AR
+  EN
+}
+
+model UserPermission {
+  id        String   @id @default(cuid())
+  userId    String
+  resource  String
+  actions   String[] // JSON array of actions
+  createdAt DateTime @default(now())
+
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_permissions")
+}
+
+// Store Management
+model Store {
+  id          String          @id @default(cuid())
+  merchantId  String
+  name        String
+  description String
+  logo        String?
+  coverImage  String?
+  category    String
+  status      StoreStatus     @default(PENDING)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  // Relations
+  merchant    User            @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  products    Product[]
+  orders      Order[]
+  settings    StoreSettings?
+  analytics   StoreAnalytics?
+
+  @@map("stores")
+}
+
+enum StoreStatus {
+  ACTIVE
+  INACTIVE
+  PENDING
+  SUSPENDED
+}
+
+model StoreSettings {
+  id              String   @id @default(cuid())
+  storeId         String   @unique
+  
+  // Theme
+  primaryColor    String   @default("#3B82F6")
+  secondaryColor  String   @default("#F59E0B")
+  layout          Layout   @default(GRID)
+  
+  // Notifications
+  newOrders       Boolean  @default(true)
+  lowStock        Boolean  @default(true)
+  reviews         Boolean  @default(true)
+  
+  // Shipping
+  freeShippingThreshold Float?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  store           Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  shippingRates   ShippingRate[]
+
+  @@map("store_settings")
+}
+
+enum Layout {
+  GRID
+  LIST
+}
+
+model ShippingRate {
+  id             String        @id @default(cuid())
+  storeSettingsId String
+  zone           String
+  rate           Float
+  estimatedDays  Int
+  
+  // Relations
+  storeSettings  StoreSettings @relation(fields: [storeSettingsId], references: [id], onDelete: Cascade)
+
+  @@map("shipping_rates")
+}
+
+model StoreAnalytics {
+  id           String   @id @default(cuid())
+  storeId      String   @unique
+  totalViews   Int      @default(0)
+  totalOrders  Int      @default(0)
+  totalRevenue Float    @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  store        Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  monthlyStats MonthlyStats[]
+
+  @@map("store_analytics")
+}
+
+model MonthlyStats {
+  id              String         @id @default(cuid())
+  storeAnalyticsId String
+  month           String
+  views           Int            @default(0)
+  orders          Int            @default(0)
+  revenue         Float          @default(0)
+  
+  // Relations
+  storeAnalytics  StoreAnalytics @relation(fields: [storeAnalyticsId], references: [id], onDelete: Cascade)
+
+  @@map("monthly_stats")
+}
+
+// Product Management
+model Product {
+  id              String        @id @default(cuid())
+  storeId         String
+  name            String
+  description     String
+  price           Float
+  salePrice       Float?
+  images          String[]      // JSON array of image URLs
+  category        String
+  tags            String[]      // JSON array of tags
+  
+  // Inventory
+  quantity        Int           @default(0)
+  sku             String        @unique
+  lowStockThreshold Int         @default(5)
+  
+  specifications  Json?         // JSON object for specifications
+  status          ProductStatus @default(ACTIVE)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  store           Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  orderItems      OrderItem[]
+
+  @@map("products")
+}
+
+enum ProductStatus {
+  ACTIVE
+  INACTIVE
+  OUT_OF_STOCK
+}
+
+// Order Management
+model Order {
+  id              String        @id @default(cuid())
+  customerId      String
+  storeId         String
+  subtotal        Float
+  shipping        Float
+  tax             Float
+  total           Float
+  status          OrderStatus   @default(PENDING)
+  
+  // Shipping Address
+  shippingStreet  String
+  shippingCity    String
+  shippingState   String
+  shippingCountry String
+  shippingZip     String
+  
+  // Billing Address
+  billingStreet   String
+  billingCity     String
+  billingState    String
+  billingCountry  String
+  billingZip      String
+  
+  paymentMethod   String
+  notes           String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  customer        User          @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  store           Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  items           OrderItem[]
+
+  @@map("orders")
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+model OrderItem {
+  id           String  @id @default(cuid())
+  orderId      String
+  productId    String
+  productName  String
+  productImage String
+  quantity     Int
+  price        Float
+  total        Float
+
+  // Relations
+  order        Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product      Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("order_items")
+}
+
+// Content Management
+model ContentPage {
+  id              String        @id @default(cuid())
+  title           String
+  slug            String        @unique
+  content         String
+  excerpt         String?
+  status          ContentStatus @default(DRAFT)
+  type            ContentType   @default(PAGE)
+  language        Language      @default(AR)
+  
+  // SEO
+  metaTitle       String
+  metaDescription String
+  keywords        String[]      // JSON array
+  ogImage         String?
+  
+  featuredImage   String?
+  publishedAt     DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  authorId        String
+
+  // Relations
+  author          User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  categories      CategoryPage[]
+  tags            String[]      // JSON array
+
+  @@map("content_pages")
+}
+
+enum ContentStatus {
+  PUBLISHED
+  DRAFT
+  PRIVATE
+}
+
+enum ContentType {
+  PAGE
+  POST
+  NEWS
+}
+
+model Category {
+  id          String         @id @default(cuid())
+  name        String
+  slug        String         @unique
+  description String?
+  parentId    String?
+  color       String?
+  icon        String?
+  count       Int            @default(0)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  // Relations
+  parent      Category?      @relation("CategoryParent", fields: [parentId], references: [id])
+  children    Category[]     @relation("CategoryParent")
+  pages       CategoryPage[]
+
+  @@map("categories")
+}
+
+model CategoryPage {
+  categoryId String
+  pageId     String
+
+  // Relations
+  category   Category    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  page       ContentPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@id([categoryId, pageId])
+  @@map("category_pages")
+}
+
+model Media {
+  id           String   @id @default(cuid())
+  filename     String
+  originalName String
+  mimeType     String
+  size         Int
+  url          String
+  thumbnailUrl String?
+  alt          String?
+  caption      String?
+  description  String?
+  uploadedById String
+  createdAt    DateTime @default(now())
+
+  // Relations
+  uploadedBy   User     @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
+
+  @@map("media")
+}
+
+// System Management
+model AppSettings {
+  id                    String  @id @default(cuid())
+  
+  // Theme
+  primaryColor          String  @default("#3B82F6")
+  secondaryColor        String  @default("#F59E0B")
+  fontFamily            String  @default("Cairo")
+  layout                String  @default("modern")
+  
+  // Branding
+  appName               String  @default("بيت السوداني")
+  logo                  String?
+  favicon               String?
+  heroBackground        String?
+  tagline               String?
+  
+  // Features
+  enableMarketplace     Boolean @default(true)
+  enableProducts        Boolean @default(true)
+  enableCompanies       Boolean @default(true)
+  enableJobs            Boolean @default(true)
+  enableServices        Boolean @default(true)
+  enableAds             Boolean @default(true)
+  enableReviews         Boolean @default(true)
+  enableChat            Boolean @default(true)
+  
+  // Navigation
+  visibleSections       String[] // JSON array
+  customOrder           String[] // JSON array
+  
+  // Localization
+  defaultLanguage       Language @default(AR)
+  supportedLanguages    String[] // JSON array
+  rtlSupport            Boolean  @default(true)
+  
+  // Policies
+  termsOfService        String?
+  privacyPolicy         String?
+  refundPolicy          String?
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@map("app_settings")
+}
+
+model SystemSettings {
+  id                      String  @id @default(cuid())
+  
+  // Security
+  enableTwoFactor         Boolean @default(false)
+  sessionTimeout          Int     @default(3600)
+  maxLoginAttempts        Int     @default(5)
+  passwordMinLength       Int     @default(8)
+  passwordRequireSpecial  Boolean @default(true)
+  enableEmailVerification Boolean @default(true)
+  enableSMSVerification   Boolean @default(false)
+  
+  // API
+  rateLimitEnabled        Boolean @default(true)
+  requestsPerMinute       Int     @default(100)
+  burstLimit              Int     @default(200)
+  corsEnabled             Boolean @default(true)
+  allowedOrigins          String[] // JSON array
+  allowCredentials        Boolean @default(true)
+  jwtSecret               String
+  jwtExpiresIn            String  @default("24h")
+  refreshTokenExpiresIn   String  @default("7d")
+  
+  // Database
+  backupFrequency         String  @default("daily")
+  maxConnections          Int     @default(100)
+  queryTimeout            Int     @default(30000)
+  enableSlowQueryLog      Boolean @default(true)
+  
+  // Notifications
+  emailEnabled            Boolean @default(false)
+  smtpHost                String?
+  smtpPort                Int?
+  smtpUser                String?
+  smtpPassword            String?
+  fromEmail               String?
+  fromName                String?
+  
+  smsEnabled              Boolean @default(false)
+  smsProvider             String?
+  smsApiKey               String?
+  smsApiSecret            String?
+  smsFromNumber           String?
+  
+  pushEnabled             Boolean @default(false)
+  fcmServerKey            String?
+  apnsCertificate         String?
+  
+  // Integrations
+  paymentEnabled          Boolean @default(false)
+  googleAnalyticsEnabled  Boolean @default(false)
+  googleAnalyticsId       String?
+  facebookPixelEnabled    Boolean @default(false)
+  facebookPixelId         String?
+  
+  // Maintenance
+  maintenanceEnabled      Boolean @default(false)
+  maintenanceMessage      String?
+  allowedIPs              String[] // JSON array
+  
+  // Logging
+  logLevel                String  @default("info")
+  enableFileLogging       Boolean @default(true)
+  enableDatabaseLogging   Boolean @default(true)
+  maxLogFileSize          Int     @default(10485760) // 10MB
+  logRetentionDays        Int     @default(30)
+  
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  @@map("system_settings")
+}
+
+model SystemLog {
+  id         String   @id @default(cuid())
+  level      LogLevel
+  message    String
+  metadata   Json?    // JSON object for additional data
+  userId     String?
+  ipAddress  String?
+  userAgent  String?
+  timestamp  DateTime @default(now())
+
+  // Relations
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("system_logs")
+}
+
+enum LogLevel {
+  ERROR
+  WARN
+  INFO
+  DEBUG
+}
+
+model Translation {
+  id          String   @id @default(cuid())
+  key         String
+  language    Language
+  value       String
+  category    String
+  context     String?
+  isPlural    Boolean  @default(false)
+  pluralForms Json?    // JSON object for plural forms
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([key, language])
+  @@map("translations")
+}
+
+model Menu {
+  id        String     @id @default(cuid())
+  name      String
+  location  MenuLocation
+  language  Language   @default(AR)
+  isActive  Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  // Relations
+  items     MenuItem[]
+
+  @@map("menus")
+}
+
+enum MenuLocation {
+  HEADER
+  FOOTER
+  SIDEBAR
+  CUSTOM
+}
+
+model MenuItem {
+  id        String       @id @default(cuid())
+  menuId    String
+  label     String
+  url       String
+  type      MenuItemType @default(CUSTOM)
+  target    String       @default("_self")
+  icon      String?
+  order     Int          @default(0)
+  parentId  String?
+  
+  // Relations
+  menu      Menu         @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  parent    MenuItem?    @relation("MenuItemParent", fields: [parentId], references: [id])
+  children  MenuItem[]   @relation("MenuItemParent")
+
+  @@map("menu_items")
+}
+
+enum MenuItemType {
+  PAGE
+  CATEGORY
+  CUSTOM
+  EXTERNAL
+}
+
+model ContentTemplate {
+  id          String              @id @default(cuid())
+  name        String
+  description String?
+  type        ContentTemplateType @default(PAGE)
+  content     String
+  variables   Json?               // JSON array of template variables
+  preview     String?
+  isDefault   Boolean             @default(false)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@map("content_templates")
+}
+
+enum ContentTemplateType {
+  PAGE
+  POST
+  EMAIL
+}
